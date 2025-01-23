@@ -58,7 +58,7 @@ int main()
 		return 1;
 	}
 
-	while(1)
+	// while(1)
 	{
 		printf("Waiting for a client to connect...\n");
 		client_addr_len = sizeof(client_addr);
