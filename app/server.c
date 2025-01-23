@@ -59,7 +59,7 @@ int main()
 	}
 
 	char BUFFER[1024];
-	char RESPONSE = "HTTP/1.1 200 OK\r\n\r\n";
+	char RESPONSE[] = "HTTP/1.1 200 OK\r\n\r\n";
 	int client_socket;
 	while(1)
 	{
@@ -73,7 +73,8 @@ int main()
 			perror("Accept failed");
 			continue;
 		}
-		size_t bytes_read = (client_socket, BUFFER, 1024);
+		printf("Client connected\n");
+		size_t bytes_read = read(client_socket, BUFFER, 1024);
 
 		if (bytes_read < 0)
 		{
@@ -82,11 +83,10 @@ int main()
 			continue;
 		}
 		BUFFER[bytes_read] = 0;
+		printf("BUFFER: %s\n", BUFFER);
 
 		write(client_socket, RESPONSE, strlen(RESPONSE));
-
-
-		printf("Client connected\n");
+		close(client_socket);
 	}
 	
 
