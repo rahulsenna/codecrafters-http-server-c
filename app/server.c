@@ -58,12 +58,34 @@ int main()
 		return 1;
 	}
 
-	// while(1)
+	char BUFFER[1024];
+	char RESPONSE = "HTTP/1.1 200 OK\r\n\r\n";
+	int client_socket;
+	while(1)
 	{
 		printf("Waiting for a client to connect...\n");
 		client_addr_len = sizeof(client_addr);
 
-		accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+		client_socket = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+
+		if (client_socket == -1)
+		{
+			perror("Accept failed");
+			continue;
+		}
+		size_t bytes_read = (client_socket, BUFFER, 1024);
+
+		if (bytes_read < 0)
+		{
+			perror("Read failed");
+			close(client_socket);
+			continue;
+		}
+		BUFFER[bytes_read] = 0;
+
+		write(client_socket, RESPONSE, strlen(RESPONSE));
+
+
 		printf("Client connected\n");
 	}
 	
