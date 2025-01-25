@@ -60,6 +60,7 @@ int main()
 	}
 
 	char BUFFER[1024];
+	char response[1024];
 	int client_socket;
 	while(1)
 	{
@@ -88,17 +89,30 @@ int main()
         char *method       = strtok(BUFFER, " ");
         char *path         = strtok(0, " ");
         char *http_version = strtok(0, "\r\n");
+        char *host         = strtok(0, "\r\n");
+        char *user_agent   = strtok(0, "\r\n");
+		if (user_agent)
+			user_agent += strlen("User-Agent: ");
 
-		printf("method: %s\n", method);
+        printf("method: %s\n", method);
 		printf("path: %s\n", path);
 		printf("http_version: %s\n", http_version);
-
+		printf("host: %s\n", host);
+		printf("user_agent: %s\n", user_agent);
         if (strlen(path) == 1)
         {
             write(client_socket, "HTTP/1.1 200 OK\r\n\r\n", strlen("HTTP/1.1 200 OK\r\n\r\n"));
-        } else if (strncmp(path, "/echo/", 6) == 0)
+        } else if (strncmp(path, "/user-agent", 11) == 0)
         {
-			char response[1024];
+			snprintf(response, sizeof(response),
+			"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
+			strlen(user_agent),user_agent);
+
+            write(client_socket, response, strlen(response));		
+		}
+		else if (strncmp(path, "/echo/", 6) == 0)
+        {
+			
 			char *arg = path+6;
 			snprintf(response, sizeof(response),
 			"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
@@ -106,7 +120,7 @@ int main()
 
             write(client_socket, response, strlen(response));
 		}
-		
+
 		else
 		{
             write(client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
