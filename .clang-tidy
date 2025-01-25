@@ -1,0 +1,6 @@
+Checks: 'clang-diagnostic-*,clang-analyzer-*,bugprone-*,misc-*,google-runtime-int,llvm-header-guard,fuchsia-restrict-system-includes,-clang-analyzer-valist.Uninitialized,-clang-analyzer-security.insecureAPI.rand,-clang-analyzer-alpha.*,-bugprone-sizeof-expression'
+WarningsAsErrors: ''
+HeaderFilterRegex: 'src\/.*.h'
+
+
+

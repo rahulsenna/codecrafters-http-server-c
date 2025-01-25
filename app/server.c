@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <string.h>
 
 int main()
 {
@@ -59,7 +60,6 @@ int main()
 	}
 
 	char BUFFER[1024];
-	char RESPONSE[] = "HTTP/1.1 200 OK\r\n\r\n";
 	int client_socket;
 	while(1)
 	{
@@ -83,9 +83,24 @@ int main()
 			continue;
 		}
 		BUFFER[bytes_read] = 0;
-		printf("BUFFER: %s\n", BUFFER);
+		// printf("BUFFER: %s\n", BUFFER);
 
-		write(client_socket, RESPONSE, strlen(RESPONSE));
+        char *method       = strtok(BUFFER, " ");
+        char *path         = strtok(0, " ");
+        char *http_version = strtok(0, "\r\n");
+
+		printf("method: %s\n", method);
+		printf("path: %s\n", path);
+		printf("http_version: %s\n", http_version);
+
+		if (strcmp(path, "/") == 0)
+		{
+            write(client_socket, "HTTP/1.1 200 OK\r\n\r\n", strlen("HTTP/1.1 200 OK\r\n\r\n"));
+        } else
+		{
+            write(client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
+        }
+
 		close(client_socket);
 	}
 	
