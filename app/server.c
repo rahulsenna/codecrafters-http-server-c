@@ -93,10 +93,21 @@ int main()
 		printf("path: %s\n", path);
 		printf("http_version: %s\n", http_version);
 
-		if (strcmp(path, "/") == 0)
-		{
+        if (strlen(path) == 1)
+        {
             write(client_socket, "HTTP/1.1 200 OK\r\n\r\n", strlen("HTTP/1.1 200 OK\r\n\r\n"));
-        } else
+        } else if (strncmp(path, "/echo/", 6) == 0)
+        {
+			char response[1024];
+			char *arg = path+6;
+			snprintf(response, sizeof(response),
+			"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
+			strlen(arg),arg);
+
+            write(client_socket, response, strlen(response));
+		}
+		
+		else
 		{
             write(client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
         }
