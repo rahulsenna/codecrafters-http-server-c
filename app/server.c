@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>
+#include <fcntl.h>
 
 
 void *handle_client(int *client_socket)
@@ -56,8 +57,31 @@ void *handle_client(int *client_socket)
                  strlen(arg), arg);
 
         write(*client_socket, response, strlen(response));
-    }
-    else
+    } else if (strncmp(path, "/files/", 7) == 0)
+    {
+        char *filename = path + 7;
+		char filepath[256] = "/tmp/data/codecrafters.io/http-server-tester/";
+		strcat(filepath, filename);
+		int file_ptr = open(filepath, O_RDONLY);
+        if (file_ptr == -1)
+        {
+	        write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
+			close(*client_socket);
+			return NULL;		
+		}
+
+		char file_buffer[1024*4];
+
+		size_t file_size = read(file_ptr, file_buffer, 1024*4);
+		close(file_ptr);
+        file_buffer[file_size] = 0;
+
+        snprintf(response, sizeof(response),
+                 "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %lu\r\n\r\n%s",
+                 (file_size), file_buffer);
+
+        write(*client_socket, response, strlen(response));
+    } else
     {
         write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
     }
