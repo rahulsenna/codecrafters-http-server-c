@@ -10,6 +10,18 @@
 #include <pthread.h>
 #include <fcntl.h>
 
+typedef enum
+{
+    METHOD = 0x0,
+    PATH,
+    HTTP_VER,
+    HOST,
+    USER_AGENT,
+    ACCEPT,
+    CONTENT_TYPE,
+    CONTENT_LENGTH,
+    HEADER_COUNT
+} HeaderType;
 
 void *handle_client(int *client_socket)
 {
@@ -26,17 +38,42 @@ void *handle_client(int *client_socket)
         return NULL;
     }
     BUFFER[bytes_read] = 0;
-    // printf("BUFFER: %s\n", BUFFER);
+    printf("BUFFER: %s\n", BUFFER);
 
-    char *method       = strtok(BUFFER, " ");
-    char *path         = strtok(0, " ");
-    char *http_version = strtok(0, "\r\n");
-    char *host         = strtok(0, "\r\n");
-    char *user_agent   = strtok(0, "\r\n");
-    if (user_agent)
-        user_agent += strlen("User-Agent: ");
-    printf("client_socket: %d\nmethod: %s\npath: %s\nhttp_version: %s\nhost: %s\nuser_agent: %s\n",
-           *client_socket, method, path, http_version, host, user_agent);
+	char *header_info[HEADER_COUNT] = {NULL};
+	char *saveptr = NULL;
+    char *line;
+
+    char *method       = strtok_r(BUFFER, " ", &saveptr);
+    char *path         = strtok_r(0, " ", &saveptr);
+    char *http_version = strtok_r(0, "\r\n", &saveptr);
+    char *host         = strtok_r(0, "\r\n", &saveptr);
+
+    char *last_line;
+    size_t header_len;
+    // Safely tokenize the headers
+    while ((line = strtok_r(0, "\r\n", &saveptr)) != NULL)
+    {
+        // User-Agent header
+        if (strncmp(line, "User-Agent: ", header_len = strlen("User-Agent: ")) == 0)        
+            header_info[USER_AGENT] = line + header_len;
+        // Accept header
+        else if (strncmp(line, "Accept: ", header_len = strlen("Accept: ")) == 0)
+            header_info[ACCEPT] = line + header_len;
+        // Content-Type header
+        else if (strncmp(line, "Content-Type: ", header_len = strlen("Content-Type: ")) == 0)
+            header_info[CONTENT_TYPE] = line + header_len;
+        // Content-Length header
+        else if (strncmp(line, "Content-Length: ", header_len = strlen("Content-Length: ")) == 0)
+            header_info[CONTENT_LENGTH] = line + header_len;
+
+        // printf("Parsed line: %s\n", line);
+		last_line = line;
+    }
+	printf("last_line: %s\n", last_line);
+
+    // printf("client_socket: %d\nmethod: %s\npath: %s\nhttp_version: %s\nhost: %s\nuser_agent: %s\n",
+        //    *client_socket, method, path, http_version, host, user_agent);
 
     if (strlen(path) == 1)
     {
@@ -45,7 +82,7 @@ void *handle_client(int *client_socket)
     {
         snprintf(response, sizeof(response),
                  "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
-                 strlen(user_agent), user_agent);
+                 strlen(header_info[USER_AGENT]), header_info[USER_AGENT]);
 
         write(*client_socket, response, strlen(response));
     } else if (strncmp(path, "/echo/", 6) == 0)
@@ -62,25 +99,52 @@ void *handle_client(int *client_socket)
         char *filename = path + 7;
 		char filepath[256] = "/tmp/data/codecrafters.io/http-server-tester/";
 		strcat(filepath, filename);
-		int file_ptr = open(filepath, O_RDONLY);
-        if (file_ptr == -1)
+
+        if (strcmp(method, "GET") == 0)
         {
-	        write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
-			close(*client_socket);
-			return NULL;		
+            int file_ptr = open(filepath, O_RDONLY);
+            if (file_ptr == -1)
+            {
+                write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
+                close(*client_socket);
+                return NULL;
+            }
+
+            char file_buffer[1024 * 4];
+
+            size_t file_size = read(file_ptr, file_buffer, 1024 * 4);
+            close(file_ptr);
+            file_buffer[file_size] = 0;
+
+            snprintf(response, sizeof(response),
+                     "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %lu\r\n\r\n%s",
+                     (file_size), file_buffer);
+
+            write(*client_socket, response, strlen(response));
+        } else if (strcmp(method, "POST") == 0)
+        {
+			printf("POST METHOD: %s\n", method);
+			printf("filepath: %s\n", filepath);
+            int file_ptr = open(filepath, O_WRONLY | O_CREAT, 0644);
+            if (file_ptr == -1)
+            {
+				close(file_ptr);
+                perror("Failed to open file");
+    	        write(*client_socket, "500 Internal Server Error\r\n\r\n", strlen("500 Internal Server Error\r\n\r\n"));
+                return NULL;
+            }
+            ssize_t bytes_written =write(file_ptr, last_line, strlen(last_line));
+            if (bytes_written == -1)
+            {
+                perror("Write failed");
+                close(file_ptr);
+    	        write(*client_socket, "500 Internal Server Error\r\n\r\n", strlen("500 Internal Server Error\r\n\r\n"));
+                return NULL;
+            }
+            close(file_ptr);
+            write(*client_socket, "HTTP/1.1 201 Created\r\n\r\n", strlen("HTTP/1.1 201 Created\r\n\r\n"));
 		}
 
-		char file_buffer[1024*4];
-
-		size_t file_size = read(file_ptr, file_buffer, 1024*4);
-		close(file_ptr);
-        file_buffer[file_size] = 0;
-
-        snprintf(response, sizeof(response),
-                 "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %lu\r\n\r\n%s",
-                 (file_size), file_buffer);
-
-        write(*client_socket, response, strlen(response));
     } else
     {
         write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
