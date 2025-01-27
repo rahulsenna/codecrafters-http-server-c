@@ -20,6 +20,7 @@ typedef enum
     ACCEPT,
     CONTENT_TYPE,
     CONTENT_LENGTH,
+    ACCEPT_ENCODING,
     HEADER_COUNT
 } HeaderType;
 
@@ -66,6 +67,8 @@ void *handle_client(int *client_socket)
         // Content-Length header
         else if (strncmp(line, "Content-Length: ", header_len = strlen("Content-Length: ")) == 0)
             header_info[CONTENT_LENGTH] = line + header_len;
+		else if (strncmp(line, "Accept-Encoding: ", header_len = strlen("Accept-Encoding: ")) == 0)
+            header_info[ACCEPT_ENCODING] = line + header_len;
 
         // printf("Parsed line: %s\n", line);
 		last_line = line;
@@ -87,11 +90,14 @@ void *handle_client(int *client_socket)
         write(*client_socket, response, strlen(response));
     } else if (strncmp(path, "/echo/", 6) == 0)
     {
-
+        char *encoding = header_info[ACCEPT_ENCODING] &&
+                         strcmp(header_info[ACCEPT_ENCODING], "gzip") == 0
+                         ? "Content-Encoding: gzip\r\n"
+                         : "";
         char *arg = path + 6;
         snprintf(response, sizeof(response),
-                 "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
-                 strlen(arg), arg);
+                 "HTTP/1.1 200 OK\r\n%sContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
+                 encoding,strlen(arg), arg);
 
         write(*client_socket, response, strlen(response));
     } else if (strncmp(path, "/files/", 7) == 0)
