@@ -91,7 +91,7 @@ void *handle_client(int *client_socket)
     } else if (strncmp(path, "/echo/", 6) == 0)
     {
         char *encoding = header_info[ACCEPT_ENCODING] &&
-                         strcmp(header_info[ACCEPT_ENCODING], "gzip") == 0
+                         strstr(header_info[ACCEPT_ENCODING], "gzip")
                          ? "Content-Encoding: gzip\r\n"
                          : "";
         char *arg = path + 6;
