@@ -9,6 +9,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <fcntl.h>
+#include <zlib.h>
 
 typedef enum
 {
@@ -23,6 +24,37 @@ typedef enum
     ACCEPT_ENCODING,
     HEADER_COUNT
 } HeaderType;
+
+size_t gzip(const char *source, unsigned char *dest)
+{
+    uint64_t src_len = strlen(source);
+    z_stream strm    = {0};
+    strm.zalloc      = Z_NULL;
+    strm.zfree       = Z_NULL;
+    strm.opaque      = Z_NULL;
+    strm.avail_in    = src_len;
+    strm.next_in     = (Bytef *) source;
+    strm.avail_out   = src_len + 128;
+    strm.next_out    = dest;
+
+    // Initialize for gzip compression (window bits 15 + 16 for gzip header)
+    if (deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+                     15 | 16, 8, Z_DEFAULT_STRATEGY) != Z_OK)
+    {
+        perror("Failed to compress (defalateInit2)\n");
+		return -1;
+    }
+
+    int ret = deflate(&strm, Z_FINISH);
+    deflateEnd(&strm);
+
+    if (ret != Z_STREAM_END)
+    {
+        perror("Failed to compress (deflateEnd)\n");
+		return -1;
+    }
+    return strm.total_out;
+}
 
 void *handle_client(int *client_socket)
 {
@@ -95,11 +127,24 @@ void *handle_client(int *client_socket)
                          ? "Content-Encoding: gzip\r\n"
                          : "";
         char *arg = path + 6;
-        snprintf(response, sizeof(response),
+		if (strcmp(encoding, "Content-Encoding: gzip\r\n") == 0)
+		{
+			unsigned char compressed[1024];
+			size_t compressd_len = gzip(arg, compressed);
+			
+            snprintf(response, sizeof(response),
+                 "HTTP/1.1 200 OK\r\n%sContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n",
+                 encoding,compressd_len);
+            write(*client_socket, response, strlen(response));
+            write(*client_socket, compressed, compressd_len);
+
+        } else
+        {
+            snprintf(response, sizeof(response),
                  "HTTP/1.1 200 OK\r\n%sContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
                  encoding,strlen(arg), arg);
-
-        write(*client_socket, response, strlen(response));
+            write(*client_socket, response, strlen(response));
+        }
     } else if (strncmp(path, "/files/", 7) == 0)
     {
         char *filename = path + 7;
