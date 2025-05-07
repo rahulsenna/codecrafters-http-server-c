@@ -22,6 +22,7 @@ typedef enum
     CONTENT_TYPE,
     CONTENT_LENGTH,
     ACCEPT_ENCODING,
+    CONNECTION,
     HEADER_COUNT
 } HeaderType;
 
@@ -62,6 +63,7 @@ void *handle_client(int *client_socket)
     char response[1024];
 
     printf("Client connected\n");
+connection_begin:;
     size_t bytes_read = read(*client_socket, BUFFER, 1024);
 
     if (bytes_read <= 0)
@@ -101,6 +103,8 @@ void *handle_client(int *client_socket)
             header_info[CONTENT_LENGTH] = line + header_len;
 		else if (strncmp(line, "Accept-Encoding: ", header_len = strlen("Accept-Encoding: ")) == 0)
             header_info[ACCEPT_ENCODING] = line + header_len;
+        else if (strncmp(line, "Connection: ", header_len = strlen("Connection: ")) == 0)
+            header_info[CONNECTION] = line + header_len;
 
         // printf("Parsed line: %s\n", line);
 		last_line = line;
@@ -201,7 +205,11 @@ void *handle_client(int *client_socket)
         write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
     }
 
-    close(*client_socket);
+
+    if (header_info[CONNECTION] && strncmp(header_info[CONNECTION], "close", strlen("close")) == 0)
+        close(*client_socket);
+    else
+        goto connection_begin;
 	return NULL;
 }
 
