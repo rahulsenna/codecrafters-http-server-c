@@ -111,17 +111,24 @@ connection_begin:;
     }
 	printf("last_line: %s\n", last_line);
 
+    char connection_header[30] = {0};
+    if (header_info[CONNECTION] && strncmp(header_info[CONNECTION], "close", strlen("close")) == 0)
+    {
+        snprintf(connection_header, sizeof(connection_header), "\r\nConnection: close");
+    }
+
     // printf("client_socket: %d\nmethod: %s\npath: %s\nhttp_version: %s\nhost: %s\nuser_agent: %s\n",
         //    *client_socket, method, path, http_version, host, user_agent);
 
     if (strlen(path) == 1)
     {
-        write(*client_socket, "HTTP/1.1 200 OK\r\n\r\n", strlen("HTTP/1.1 200 OK\r\n\r\n"));
+        snprintf(response, sizeof(response), "HTTP/1.1 200 OK%s\r\n\r\n", connection_header);
+        write(*client_socket, response, strlen(response));
     } else if (strncmp(path, "/user-agent", 11) == 0)
     {
         snprintf(response, sizeof(response),
-                 "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
-                 strlen(header_info[USER_AGENT]), header_info[USER_AGENT]);
+                 "HTTP/1.1 200 OK%s\r\nContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
+                 connection_header, strlen(header_info[USER_AGENT]), header_info[USER_AGENT]);
 
         write(*client_socket, response, strlen(response));
     } else if (strncmp(path, "/echo/", 6) == 0)
@@ -137,16 +144,16 @@ connection_begin:;
 			size_t compressd_len = gzip(arg, compressed);
 			
             snprintf(response, sizeof(response),
-                 "HTTP/1.1 200 OK\r\n%sContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n",
-                 encoding,compressd_len);
+                 "HTTP/1.1 200 OK%s\r\n%sContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n",
+                 connection_header, encoding,compressd_len);
             write(*client_socket, response, strlen(response));
             write(*client_socket, compressed, compressd_len);
 
         } else
         {
             snprintf(response, sizeof(response),
-                 "HTTP/1.1 200 OK\r\n%sContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
-                 encoding,strlen(arg), arg);
+                 "HTTP/1.1 200 OK%s\r\n%sContent-Type: text/plain\r\nContent-Length: %lu\r\n\r\n%s",
+                 connection_header, encoding,strlen(arg), arg);
             write(*client_socket, response, strlen(response));
         }
     } else if (strncmp(path, "/files/", 7) == 0)
@@ -160,7 +167,8 @@ connection_begin:;
             int file_ptr = open(filepath, O_RDONLY);
             if (file_ptr == -1)
             {
-                write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
+                snprintf(response, sizeof(response), "HTTP/1.1 404 Not Found%s\r\n\r\n", connection_header);
+                write(*client_socket, response, strlen(response));
                 close(*client_socket);
                 return NULL;
             }
@@ -172,8 +180,8 @@ connection_begin:;
             file_buffer[file_size] = 0;
 
             snprintf(response, sizeof(response),
-                     "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %lu\r\n\r\n%s",
-                     (file_size), file_buffer);
+                     "HTTP/1.1 200 OK%s\r\nContent-Type: application/octet-stream\r\nContent-Length: %lu\r\n\r\n%s",
+                     connection_header, (file_size), file_buffer);
 
             write(*client_socket, response, strlen(response));
         } else if (strcmp(method, "POST") == 0)
@@ -197,12 +205,14 @@ connection_begin:;
                 return NULL;
             }
             close(file_ptr);
-            write(*client_socket, "HTTP/1.1 201 Created\r\n\r\n", strlen("HTTP/1.1 201 Created\r\n\r\n"));
+            snprintf(response, sizeof(response), "HTTP/1.1 201 Created%s\r\n\r\n", connection_header);
+            write(*client_socket, response, strlen(response));
 		}
 
     } else
     {
-        write(*client_socket, "HTTP/1.1 404 Not Found\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\n\r\n"));
+        snprintf(response, sizeof(response), "HTTP/1.1 404 Not Found%s\r\n\r\n", connection_header);
+        write(*client_socket, response, strlen(response));
     }
 
 
